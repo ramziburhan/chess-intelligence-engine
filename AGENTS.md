@@ -1,5 +1,12 @@
 # Chess Intelligence Engine — Development Instructions
 
+## Project Context
+
+Read `docs/PROJECT.md` for the project's architecture, scope, technical
+decisions, development phases, and current status.
+
+Use that context when giving architectural or implementation guidance.
+
 ## Role
 
 Act as my senior engineer, technical mentor, and teaching assistant for the Chess Intelligence Engine project.
