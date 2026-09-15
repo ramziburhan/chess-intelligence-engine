@@ -186,6 +186,56 @@ predetermined complexity.
 
 **Current phase:** Phase 0 — Local Monolith
 
-**Current milestone:** Given a Chess.com username, retrieve the PGN for one
-game and understand the Chess.com API flow before implementing engine
-analysis.
+**Completed milestones:**
+
+- Retrieve the latest available archived game PGN for a Chess.com username.
+- Parse a PGN into ordered FEN positions, including the starting position.
+- Analyze positions with one shared Stockfish process and a per-position node
+  budget.
+- Return structured centipawn or mate scores from White's perspective,
+  preserving upper/lower bounds and reversing their direction when needed.
+- Measure local analysis throughput with one search thread.
+
+**Next milestone:** Associate adjacent position evaluations with individual
+moves as groundwork for measuring loss in win probability. Mate scores and
+search bounds need explicit handling before interpreting evaluation changes.
+
+## Initial Phase 0 Performance Baseline
+
+Measured locally on September 14, 2026; results recorded from the developer's
+benchmark runs.
+
+| Setting | Value |
+| --- | --- |
+| Benchmark script | `scripts/benchmark_analysis.py` |
+| Game | https://www.chess.com/game/live/174488590032 |
+| Engine | Stockfish 19 |
+| Search threads | 1, explicitly configured |
+| Positions per run | 57, including the starting position |
+| Node budget | 10,000 per position |
+| Runs | 3, using the same positions fetched and parsed once |
+
+| Run | Elapsed seconds | Positions per second |
+| --- | ---: | ---: |
+| 1 | 1.272595 | 44.790352 |
+| 2 | 1.054902 | 54.033432 |
+| 3 | 1.061401 | 53.702589 |
+
+**Median throughput: 53.70 positions per second.** Throughput is the number
+of returned evaluations divided by elapsed seconds, measured with
+`time.perf_counter()` around `analyze_positions(...)`.
+
+Each run starts one Stockfish process, reuses it for all positions, and closes
+it. Timing includes engine startup, analysis, and shutdown; it excludes API
+retrieval, PGN parsing, metadata extraction, and printing.
+
+This is a single-search-thread measurement, not a CPU-affinity-controlled
+per-core benchmark. It measures completed position evaluations, not
+Stockfish's internal search nodes per second. The first run was slower, but
+the cause has not been established. These results characterize this game and
+search budget; they do not establish evaluation quality or general throughput.
+Hardware details beyond the local Mac environment were not recorded.
+
+For comparisons, reuse this game's PGN rather than fetching whatever game is
+latest at the time, and record the engine version, thread count, node budget,
+and timing scope alongside each result.
