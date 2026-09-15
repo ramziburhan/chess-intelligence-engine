@@ -43,6 +43,7 @@ def analyze_positions(positions: list[str], engine_path: str, node_limit: int):
 
     scores = []
     with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
+        engine.configure({"Threads": 1})
         for position in positions:
             score = analyze_position(position, engine, node_limit)
             scores.append(score)
