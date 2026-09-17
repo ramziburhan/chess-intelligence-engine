@@ -28,6 +28,15 @@ def analyze_position(fen: str, engine: chess.engine.SimpleEngine, node_limit: in
     score["upperbound"] = upperbound
     score["lowerbound"] = lowerbound
 
+    is_checkmate = board.is_checkmate()
+
+    if is_checkmate == True:
+        score["is_checkmate"] = is_checkmate
+        score["winner"] = chess.COLOR_NAMES[not board.turn]
+    else:
+        score["is_checkmate"] = is_checkmate
+        score["winner"] = None
+
     return score
 
 def analyze_positions(positions: list[str], engine_path: str, node_limit: int):
