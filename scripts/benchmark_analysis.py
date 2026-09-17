@@ -18,8 +18,10 @@ link = game.headers["Link"]
 
 for i in range(3):
     start = time.perf_counter()
-    scores = analyze_positions(positions, engine_path, node_limit)
+    engine_analysis = analyze_positions(positions, engine_path, node_limit)
     end = time.perf_counter()
+
+    scores = engine_analysis["scores"]
 
     number_of_positions = len(scores)
     elapsed = end - start

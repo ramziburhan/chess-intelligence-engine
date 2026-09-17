@@ -42,9 +42,16 @@ def analyze_positions(positions: list[str], engine_path: str, node_limit: int):
         raise ValueError("Node limit must be a positive integer.")
 
     scores = []
+    thread_count = 1
     with chess.engine.SimpleEngine.popen_uci(engine_path) as engine:
-        engine.configure({"Threads": 1})
+        engine.configure({"Threads": thread_count})
+        engine_name = engine.id["name"]
         for position in positions:
             score = analyze_position(position, engine, node_limit)
             scores.append(score)
-    return scores
+    analysis_settings = {"engine_name": engine_name, 
+                         "threads": thread_count,
+                         "node_limit": node_limit}
+    output = {"scores": scores, 
+              "analysis_settings": analysis_settings}
+    return output
