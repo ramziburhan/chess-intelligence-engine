@@ -2,7 +2,6 @@ import requests
 
 #This function fetches the latest game PGN from chess.com for a given username.
 def fetch_latest_game_pgn(username: str) -> str:
-
     headers = {"User-Agent": "ChessIntelligenceEngine/0.1 (learning project)"}
     
     username = username.strip()
@@ -19,7 +18,7 @@ def fetch_latest_game_pgn(username: str) -> str:
 
     if not archive_list:
         raise ValueError("No archives in user history!")
-
+    
     latest_archive_url = archive_list[-1]
 
     second_response = requests.get(latest_archive_url, headers=headers, timeout=10)
