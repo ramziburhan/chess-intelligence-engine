@@ -184,7 +184,8 @@ predetermined complexity.
 
 ## Current Status
 
-**Current phase:** Phase 0 — Local Monolith
+**Current status:** Phase 0 local prototype complete within the scope and
+limitations below. Phase 1 implementation has not started.
 
 **Completed milestones:**
 
@@ -195,10 +196,51 @@ predetermined complexity.
 - Return structured centipawn or mate scores from White's perspective,
   preserving upper/lower bounds and reversing their direction when needed.
 - Measure local analysis throughput with one search thread.
+- Assemble game reports containing game metadata, indexed FEN positions,
+  evaluations, and the running engine's name, configured thread count, and
+  per-position node budget.
+- Identify already-checkmated positions and their winners explicitly,
+  distinguishing them from positions with a future forced mate.
+- Export reports to JSON, create missing output directories, and verify that
+  reading the JSON back reproduces the original report dictionary.
+- Save a fixed benchmark PGN and document setup and script usage in the README.
 
-**Next milestone:** Associate adjacent position evaluations with individual
-moves as groundwork for measuring loss in win probability. Mate scores and
-search bounds need explicit handling before interpreting evaluation changes.
+### Phase 0 Completion Review
+
+| Original goal | Evidence and scope |
+| --- | --- |
+| Fetch public Chess.com game history | Retrieve one latest available archived game through the archive API; bulk history ingestion is not implemented. |
+| Parse PGNs | Reconstruct ordered positions, including the starting position, from one game's main line. |
+| Analyze one game locally | Reuse one Stockfish process across all positions with a fixed node budget per position. |
+| Produce structured output | Export game metadata, position evaluations, checkmate information, and engine settings as JSON. |
+| Measure throughput per core | Establish a single-search-thread baseline; CPU affinity and strict per-core throughput were not measured. |
+
+Validation so far includes developer-run successful retrieval and parsing,
+invalid-input checks, live centipawn and mate examples, full-game reports,
+repeated benchmarks, and JSON round-trip checks. These are not an exhaustive
+automated regression suite or a clean-machine setup verification.
+
+**Next step:** Plan the first small Phase 1 service boundary around the
+existing local analysis pipeline. No scaling bottleneck has been established
+by the initial benchmark; any decomposition should have an explicit workload
+or learning justification. Win-probability loss and player-profile reports
+remain future work, not additional Phase 0 completion requirements.
+
+### Known Limitations
+
+- Each position is reconstructed from a standalone FEN, so Stockfish does not
+  receive the played move history needed for repetition-aware analysis.
+- Position-level `winner` identifies checkmate winners only. `None` does not
+  establish a draw or an ongoing game. Resignation and other game results are
+  represented separately by the PGN result; draw reasons are not classified.
+- Evaluation quality at 10,000 nodes per position has not been validated.
+  Centipawn scores are not win probabilities, and retained search bounds must
+  not be treated as exact estimates when deriving move-level changes.
+- Reports currently require the Chess.com-style `Link` header. The local
+  scripts read a fixed PGN and use a manually configured Stockfish path; they
+  do not expose a username-based command-line interface.
+- The prototype targets standard chess; variant-aware analysis has not been
+  implemented or validated.
 
 ## Initial Phase 0 Performance Baseline
 
@@ -239,3 +281,23 @@ Hardware details beyond the local Mac environment were not recorded.
 For comparisons, reuse this game's PGN rather than fetching whatever game is
 latest at the time, and record the engine version, thread count, node budget,
 and timing scope alongside each result.
+
+### Fixed-File Benchmark Follow-up
+
+The game above is saved at `benchmarks/games/baseline.pgn`. The benchmark now
+loads that file once before its three runs, so subsequent account activity
+does not change the input. The export script uses the same fixture.
+
+The developer reported the following runs after switching to the saved file,
+with the same 57 positions, one search thread, and 10,000-node budget:
+
+| Run | Elapsed seconds | Positions per second |
+| --- | ---: | ---: |
+| 1 | 1.288224 | 44.246959 |
+| 2 | 1.048623 | 54.357004 |
+| 3 | 1.063612 | 53.590956 |
+
+**Median throughput: 53.59 positions per second.** This preserves the initial
+53.70 baseline above as a separate measurement rather than replacing its
+recorded results. Neither batch explains the slower first run or establishes
+an application bottleneck.
