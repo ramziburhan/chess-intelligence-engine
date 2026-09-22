@@ -2,13 +2,14 @@ import io
 import chess.pgn
 from chess_intelligence_engine.pgn_parser import pgn_to_board_positions
 from chess_intelligence_engine.engine_analysis import analyze_positions
+from chess_intelligence_engine.exceptions import InvalidPGNError
 
 def analysis_report(pgn: str, engine_path: str, node_limit: int):
     game = chess.pgn.read_game(io.StringIO(pgn))
     if game is None:
-        raise ValueError("PGN not able to parse.")
+        raise InvalidPGNError("PGN not able to parse.")
 
-    link = game.headers["Link"]
+    link = game.headers.get("Link")
     white_player = game.headers["White"]
     black_player = game.headers["Black"]
     result = game.headers["Result"]
