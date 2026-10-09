@@ -87,6 +87,40 @@ The script reads the JSON back and prints `True` when it matches the original
 report dictionary. Generated reports belong in the ignored `outputs/`
 directory; the saved benchmark PGN remains tracked for reproducibility.
 
+## Run the API
+
+From the project root, run:
+
+```bash
+export STOCKFISH_PATH="/opt/homebrew/bin/stockfish"
+uv run uvicorn chess_intelligence_engine.api:app --reload
+```
+
+Replace the path above with the output of `command -v stockfish`. Set the
+environment variable, STOCKFISH_PATH, in the same terminal that launches Uvicorn.
+Missing or blank `STOCKFISH_PATH` prevents startup.
+
+Open http://127.0.0.1:8000/docs to try `POST /analyses` with:
+
+```json
+{"pgn": "1. e4 e5 *"}
+```
+
+The endpoint returns 200 with an analysis report, 422 for invalid input,
+or 500 for an unexpected server failure.
+
+## Run the tests
+
+From the project root, run:
+
+```bash
+uv run pytest -v
+```
+
+The tests supply their own configuration and replace engine analysis
+where needed. They do not require a running Uvicorn server or an
+installed Stockfish executable.
+
 ## Current scope and limitations
 
 - Username-based retrieval is available through
