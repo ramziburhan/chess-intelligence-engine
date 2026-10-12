@@ -301,3 +301,67 @@ with the same 57 positions, one search thread, and 10,000-node budget:
 53.70 baseline above as a separate measurement rather than replacing its
 recorded results. Neither batch explains the slower first run or establishes
 an application bottleneck.
+
+## Phase 1 Experiment: Concurrent API Requests
+
+Measured locally on October 11, 2026; results supplied by the developer from
+`scripts/benchmark_api.py`.
+
+**Question:** Does processing two analysis requests concurrently improve
+throughput, and how does it affect individual request latency?
+
+### Setup and Method
+
+- Client and API server run on the same Mac, communicating over localhost.
+- One Uvicorn server process, without development reload.
+- Each request submits `benchmarks/games/baseline.pgn`: game
+  https://www.chess.com/game/live/174488590032, containing 57 positions.
+- Stockfish 19, one search thread per analysis, 10,000 nodes per position.
+- Each request starts and closes its own Stockfish process.
+- Three concurrent pairs are followed by three sequential pairs. Concurrent
+  pairs submit both requests before waiting; sequential pairs wait for the
+  first response before submitting the second.
+- Every response is checked for HTTP 200 and 57 returned position records.
+
+Individual request latency is measured around the HTTP POST, including
+receipt of the response body. Batch elapsed time runs from immediately before
+the first submission until both results have been retrieved and validated.
+Batch throughput is two completed requests divided by batch elapsed seconds.
+PGN file reading and printing occur outside these timers.
+
+### Results
+
+| Mode | Pair | Request 1 seconds | Request 2 seconds | Requests per second |
+| --- | ---: | ---: | ---: | ---: |
+| Concurrent | 1 | 1.135125 | 1.134713 | 1.761667 |
+| Concurrent | 2 | 1.152717 | 1.152156 | 1.734759 |
+| Concurrent | 3 | 1.157006 | 1.156290 | 1.728380 |
+| Sequential | 1 | 1.093349 | 1.102232 | 0.910828 |
+| Sequential | 2 | 1.090539 | 1.126912 | 0.901846 |
+| Sequential | 3 | 1.096918 | 1.095806 | 0.912016 |
+
+Median batch throughput was **1.735 requests/second concurrent** versus
+**0.911 sequential**, approximately **1.90 times higher**. Average individual
+request latency was approximately **1.148 seconds concurrent** versus
+**1.101 seconds sequential**, about **4.3% longer** (roughly 5%). All 12
+requests succeeded and returned 57 positions.
+
+The observed tradeoff is higher aggregate throughput with slightly longer
+individual waits. Overlapping requests allows multiple Stockfish processes
+to make progress at once. The measurements do not identify the cause of the
+small latency increase; resource contention and CPU scheduling or frequency
+changes are possible explanations, not established findings.
+
+### Limits and Next Experiment
+
+This experiment covers only three pairs per mode, one game, and one node
+budget. Concurrent runs always occurred first, so order effects were not
+controlled. Client and server share the same machine; CPU and memory usage
+were not measured. These results neither establish maximum capacity nor
+justify a specific concurrency limit or queue design.
+
+Next, compare batches of 1, 2, and 4 concurrent requests using the same input
+and settings. Record individual latencies, total batch duration, successful
+request throughput, and failures. Repeat measurements and vary mode order to
+reduce order bias. Look for where additional concurrency gives diminishing
+throughput gains while latency rises; no plateau has been demonstrated yet.
