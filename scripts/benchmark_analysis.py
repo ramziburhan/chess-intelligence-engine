@@ -22,7 +22,6 @@ for i in range(3):
     end = time.perf_counter()
 
     scores = engine_analysis["scores"]
-
     number_of_positions = len(scores)
     elapsed = end - start
     throughput = number_of_positions / elapsed

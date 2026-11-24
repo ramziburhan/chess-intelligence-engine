@@ -185,7 +185,8 @@ predetermined complexity.
 ## Current Status
 
 **Current status:** Phase 0 local prototype complete within the scope and
-limitations below. Phase 1 implementation has not started.
+limitations below. Phase 1 is underway: the synchronous analysis API and its
+tests are implemented, and concurrency experiments are informing the next step.
 
 **Completed milestones:**
 
@@ -220,10 +221,10 @@ invalid-input checks, live centipawn and mate examples, full-game reports,
 repeated benchmarks, and JSON round-trip checks. These are not an exhaustive
 automated regression suite or a clean-machine setup verification.
 
-**Next step:** Plan the first small Phase 1 service boundary around the
-existing local analysis pipeline. No scaling bottleneck has been established
-by the initial benchmark; any decomposition should have an explicit workload
-or learning justification. Win-probability loss and player-profile reports
+**Next step:** Compare server-side analysis concurrency limits of eight and
+sixteen against the existing unrestricted 32-request batch. The Phase 1
+experiments below show diminishing throughput gains and evidence of CPU
+saturation on the local Mac. Win-probability loss and player-profile reports
 remain future work, not additional Phase 0 completion requirements.
 
 ### Known Limitations
@@ -236,7 +237,7 @@ remain future work, not additional Phase 0 completion requirements.
 - Evaluation quality at 10,000 nodes per position has not been validated.
   Centipawn scores are not win probabilities, and retained search bounds must
   not be treated as exact estimates when deriving move-level changes.
-- Reports currently require the Chess.com-style `Link` header. The local
+- Reports allow a missing Chess.com-style `Link` header. The local
   scripts read a fixed PGN and use a manually configured Stockfish path; they
   do not expose a username-based command-line interface.
 - The prototype targets standard chess; variant-aware analysis has not been
@@ -365,3 +366,65 @@ and settings. Record individual latencies, total batch duration, successful
 request throughput, and failures. Repeat measurements and vary mode order to
 reduce order bias. Look for where additional concurrency gives diminishing
 throughput gains while latency rises; no plateau has been demonstrated yet.
+
+### Follow-up: Increasing Concurrent Requests
+
+Subsequent developer-run measurements used the same fixture, engine, node
+budget, and localhost setup. The benchmark submits all requests before
+collecting their results. It records failures separately and computes
+successful throughput as validated responses divided by total batch time.
+A stopped-server check recorded connection failures and zero successful
+throughput while allowing collection to finish.
+
+The latest repeated comparison rotated batch order: 8/16/4, 16/4/8, then
+4/8/16. A single exploratory 32-request batch followed.
+
+| Concurrent requests | Batch throughput, requests/sec (each run) | Median throughput | Individual request range, seconds |
+| --- | --- | ---: | --- |
+| 4 | 3.173227, 3.166136, 3.141165 | 3.166136 | 1.253–1.273 |
+| 8 | 4.784595, 4.855767, 4.811659 | 4.811659 | 1.589–1.671 |
+| 16 | 5.261024, 5.453562, 5.253237 | 5.261024 | 2.827–3.042 |
+| 32 | 4.713165 (one run) | Not established | 6.313–6.780 |
+
+All 84 requests in the repeated comparison and all 32 requests in the
+exploratory batch returned HTTP 200 and 57 positions. The 32-request batch
+took 6.789493 seconds.
+
+Doubling concurrency from eight to sixteen increased median throughput by
+only about 9%, while individual request times rose from roughly 1.6 to
+3 seconds. The single 32-request run had about 10% lower throughput than
+the sixteen-request median, with request times exceeding 6 seconds.
+
+During a sixteen-request batch, the developer observed overall CPU idle
+drop to 0% in Activity Monitor. This supports CPU saturation as a contributor
+to the slowdown. Per-process CPU percentages are distinct from overall
+machine utilization. These observations do not isolate scheduling overhead,
+memory pressure, or other possible contributors.
+
+These are short batches, not sustained-load capacity measurements. Client
+and server share the Mac, resource usage was observed manually rather than
+logged, memory pressure was not systematically measured, and the 32-request
+result has not been repeated. Eight has not been established as the optimal
+concurrency limit; sixteen achieved higher measured throughput.
+
+### Next Experiment: Limit Active Analyses
+
+Keep the client workload fixed at 32 concurrent requests and compare:
+
+1. No added server-side analysis limit (repeat the baseline).
+2. At most eight active analyses, with other requests waiting for a slot.
+3. At most sixteen active analyses, with other requests waiting for a slot.
+
+Repeat each condition and rotate condition order. Keep one Uvicorn process,
+the PGN, engine settings, and client timeout unchanged. Record successful
+throughput, batch duration, individual end-to-end request latency, and
+failures. End-to-end latency must include waiting for an analysis slot;
+separate server-side waiting and analysis timings can help explain results.
+
+The limit belongs on the server so all requests share it. Limiting client
+threads would change the offered workload instead. The initial experiment
+uses an in-process limit, not a durable job queue; pending requests still
+hold open their HTTP connections. A per-process limit would not provide a
+global cap across multiple Uvicorn processes. The hypothesis is that bounded
+analysis concurrency can improve behavior under load; the comparison must
+establish whether eight or sixteen offers a better tradeoff.

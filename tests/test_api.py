@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 from chess_intelligence_engine.api import app
 import chess_intelligence_engine.api as api_module
 import pytest
+from threading import BoundedSemaphore
 
 def test_empty_pgn_returns_422(monkeypatch):
     monkeypatch.setenv("STOCKFISH_PATH", "/test/stockfish")
@@ -68,4 +69,17 @@ def test_blank_stockfish_path_prevents_startup(monkeypatch, path):
     monkeypatch.setenv("STOCKFISH_PATH", path)
     with pytest.raises(RuntimeError, match="STOCKFISH_PATH must not be empty or whitespace."):
         with TestClient(app):
-            pass
+            pass 
+
+def test_analysis_failure_release_slot(monkeypatch):
+    monkeypatch.setenv("STOCKFISH_PATH", "/test/stockfish")
+    with TestClient(app, raise_server_exceptions=False) as client:
+        app.state.analysis_slots = BoundedSemaphore(1)
+        def fake_analysis_report(pgn, engine_path, node_limit):
+            raise RuntimeError("Internal engine failure.")
+        monkeypatch.setattr(api_module, "analysis_report", fake_analysis_report)
+        response = client.post("/analyses", json={"pgn": "1. e4 e5"})
+        assert response.status_code == 500
+        acquired = app.state.analysis_slots.acquire(blocking=False)
+        assert acquired is True
+        app.state.analysis_slots.release()
